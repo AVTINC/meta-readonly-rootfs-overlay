@@ -97,6 +97,28 @@ wait_for_device() {
 	done
 }
 
+# Function to check if the partition is formatted with ext4
+check_ext4() {
+    fs_type=$(file -sL "$ROOT_RWDEVICE" | grep -o 'ext4')
+    if [ "$fs_type" = "ext4" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Function to format the partition with ext4
+format_ext4() {
+    log "Formatting $ROOT_RWDEVICE with ext4 filesystem..."
+    mkfs.ext4 -L overlayfs "$ROOT_RWDEVICE"
+    if [ $? -eq 0 ]; then
+        log "Partition $ROOT_RWDEVICE formatted successfully."
+    else
+        fatal "Error formatting $ROOT_RWDEVICE."
+    fi
+}
+
+
 early_setup
 
 [ -z "${CONSOLE+x}" ] && CONSOLE="/dev/console"
@@ -146,6 +168,12 @@ mount_and_boot() {
 	# If a read-write device was specified via kernel command line, use
 	# it, otherwise default to tmpfs.
 	wait_for_device "${ROOT_RWDEVICE}"
+	
+	# If the ROOT_RWDEVICE is not formatted, do it now.
+	if ! check_ext4; then
+		format_ext4
+	fi
+	
 	if [ -n "${ROOT_RWDEVICE}" ]; then
 
 		ROOT_RWMOUNTPARAMS="-o $ROOT_RWMOUNTOPTIONS_DEVICE $ROOT_RWDEVICE"
